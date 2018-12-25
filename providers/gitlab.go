@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/bitly/oauth2_proxy/api"
+	"oauth2_proxy/api"
 )
 
 type GitLabProvider struct {
