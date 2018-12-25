@@ -3,11 +3,10 @@ package providers
 import (
 	"context"
 	"fmt"
+	"golang.org/x/oauth2"
 	"time"
 
-	"golang.org/x/oauth2"
-
-	oidc "github.com/coreos/go-oidc"
+	"github.com/coreos/go-oidc"
 )
 
 type OIDCProvider struct {
@@ -51,6 +50,7 @@ func (p *OIDCProvider) Redeem(redirectURL, code string) (s *SessionState, err er
 	var claims struct {
 		Email    string `json:"email"`
 		Verified *bool  `json:"email_verified"`
+		User     string `json:"nickname"`
 	}
 	if err := idToken.Claims(&claims); err != nil {
 		return nil, fmt.Errorf("failed to parse id_token claims: %v", err)
@@ -68,6 +68,7 @@ func (p *OIDCProvider) Redeem(redirectURL, code string) (s *SessionState, err er
 		RefreshToken: token.RefreshToken,
 		ExpiresOn:    token.Expiry,
 		Email:        claims.Email,
+		User:         claims.User,
 	}
 
 	return
