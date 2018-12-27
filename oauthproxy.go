@@ -280,11 +280,13 @@ func (p *OAuthProxy) makeCookie(req *http.Request, name string, value string, ex
 		}
 	}
 
+	domain := ExtractDomain(req.Host)
+
 	return &http.Cookie{
 		Name:     name,
 		Value:    value,
 		Path:     "/",
-		Domain:   p.CookieDomain,
+		Domain:   domain,
 		HttpOnly: p.CookieHttpOnly,
 		Secure:   p.CookieSecure,
 		Expires:  now.Add(expiration),
@@ -528,6 +530,11 @@ func (p *OAuthProxy) OAuthStart(rw http.ResponseWriter, req *http.Request) {
 
 func ExtractDomain(host string) (domain string) {
 	parts := strings.Split(host, ".")
+
+	if len(parts) < 2 {
+		return host
+	}
+
 	domain = parts[len(parts)-2] + "." + parts[len(parts)-1]
 
 	return domain
@@ -564,7 +571,7 @@ func (p *OAuthProxy) OAuthCallback(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if ExtractDomain(u.Hostname()) != ExtractDomain(req.Host) {
+	if redirect != "/" && ExtractDomain(u.Hostname()) != ExtractDomain(req.Host) {
 		u.Path = p.OAuthCallbackPath
 		u.RawQuery = req.Form.Encode()
 
