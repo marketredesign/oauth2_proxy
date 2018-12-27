@@ -426,7 +426,12 @@ func (p *OAuthProxy) GetRedirect(req *http.Request) (redirect string, err error)
 	}
 
 	redirect = req.Form.Get("rd")
-	if redirect == "" || !strings.HasPrefix(redirect, "/") || strings.HasPrefix(redirect, "//") {
+
+	if req.Header.Get("X-Auth-Request-Redirect") != "" {
+		redirect = req.Header.Get("X-Auth-Request-Redirect")
+	}
+
+	if redirect == "" || redirect == p.SignInPath {
 		redirect = "/"
 	}
 
@@ -521,6 +526,13 @@ func (p *OAuthProxy) OAuthStart(rw http.ResponseWriter, req *http.Request) {
 	http.Redirect(rw, req, p.provider.GetLoginURL(redirectURI, fmt.Sprintf("%v:%v", nonce, redirect)), 302)
 }
 
+func ExtractDomain(host string) (domain string) {
+	parts := strings.Split(host, ".")
+	domain = parts[len(parts)-2] + "." + parts[len(parts)-1]
+
+	return domain
+}
+
 func (p *OAuthProxy) OAuthCallback(rw http.ResponseWriter, req *http.Request) {
 	remoteAddr := getRemoteAddr(req)
 
@@ -536,13 +548,6 @@ func (p *OAuthProxy) OAuthCallback(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	session, err := p.redeemCode(req.Host, req.Form.Get("code"))
-	if err != nil {
-		log.Printf("%s error redeeming code %s", remoteAddr, err)
-		p.ErrorPage(rw, 500, "Internal Error", "Internal Error")
-		return
-	}
-
 	s := strings.SplitN(req.Form.Get("state"), ":", 2)
 	if len(s) != 2 {
 		p.ErrorPage(rw, 500, "Internal Error", "Invalid State")
@@ -550,6 +555,30 @@ func (p *OAuthProxy) OAuthCallback(rw http.ResponseWriter, req *http.Request) {
 	}
 	nonce := s[0]
 	redirect := s[1]
+
+	u, err := url.Parse(redirect)
+
+	if err != nil {
+		log.Printf("%s error parsing redirect URL %s", redirect, err)
+		p.ErrorPage(rw, 500, "Internal Error", "Internal Error")
+		return
+	}
+
+	if ExtractDomain(u.Hostname()) != ExtractDomain(req.Host) {
+		u.Path = p.OAuthCallbackPath
+		u.RawQuery = req.Form.Encode()
+
+		http.Redirect(rw, req, u.String(), 302)
+		return
+	}
+
+	session, err := p.redeemCode(req.Host, req.Form.Get("code"))
+	if err != nil {
+		log.Printf("%s error redeeming code %s", remoteAddr, err)
+		p.ErrorPage(rw, 500, "Internal Error", "Internal Error")
+		return
+	}
+
 	c, err := req.Cookie(p.CSRFCookieName)
 	if err != nil {
 		p.ErrorPage(rw, 403, "Permission Denied", err.Error())
