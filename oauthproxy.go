@@ -35,15 +35,16 @@ var SignatureHeaders []string = []string{
 }
 
 type OAuthProxy struct {
-	CookieSeed     string
-	CookieName     string
-	CSRFCookieName string
-	CookieDomain   string
-	CookieSecure   bool
-	CookieHttpOnly bool
-	CookieExpire   time.Duration
-	CookieRefresh  time.Duration
-	Validator      func(string) bool
+	CookieSeed           string
+	CookieName           string
+	CookieRedirectDomain bool
+	CSRFCookieName       string
+	CookieDomain         string
+	CookieSecure         bool
+	CookieHttpOnly       bool
+	CookieExpire         time.Duration
+	CookieRefresh        time.Duration
+	Validator            func(string) bool
 
 	RobotsPath        string
 	PingPath          string
@@ -172,15 +173,16 @@ func NewOAuthProxy(opts *Options, validator func(string) bool) *OAuthProxy {
 	}
 
 	return &OAuthProxy{
-		CookieName:     opts.CookieName,
-		CSRFCookieName: fmt.Sprintf("%v_%v", opts.CookieName, "csrf"),
-		CookieSeed:     opts.CookieSecret,
-		CookieDomain:   opts.CookieDomain,
-		CookieSecure:   opts.CookieSecure,
-		CookieHttpOnly: opts.CookieHttpOnly,
-		CookieExpire:   opts.CookieExpire,
-		CookieRefresh:  opts.CookieRefresh,
-		Validator:      validator,
+		CookieName:           opts.CookieName,
+		CSRFCookieName:       fmt.Sprintf("%v_%v", opts.CookieName, "csrf"),
+		CookieSeed:           opts.CookieSecret,
+		CookieDomain:         opts.CookieDomain,
+		CookieRedirectDomain: opts.CookieRedirectDomain,
+		CookieSecure:         opts.CookieSecure,
+		CookieHttpOnly:       opts.CookieHttpOnly,
+		CookieExpire:         opts.CookieExpire,
+		CookieRefresh:        opts.CookieRefresh,
+		Validator:            validator,
 
 		RobotsPath:        "/robots.txt",
 		PingPath:          "/ping",
@@ -280,7 +282,13 @@ func (p *OAuthProxy) makeCookie(req *http.Request, name string, value string, ex
 		}
 	}
 
-	domain := ExtractDomain(req.Host)
+	var domain string
+
+	if p.CookieRedirectDomain {
+		domain = ExtractDomain(req.Host)
+	} else {
+		domain = p.CookieDomain
+	}
 
 	return &http.Cookie{
 		Name:     name,
